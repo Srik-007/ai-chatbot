@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import os
 import re
 
-# Load API keys from .env file
+# Load API keys
 load_dotenv()
 os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
 os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
@@ -14,62 +14,76 @@ os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
 def clean_response(text):
     return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
+# Persona system prompts
+PERSONAS = {
+    "Default": "You are a helpful assistant. Please respond to the user queries in a formal way.",
+    "RoastBot": "You are RoastBot. Always respond with witty, sarcastic roasts no matter what the user says.",
+    "ShakespeareBot": "You are ShakespeareBot. Respond to all queries in Shakespeare-style old English prose.",
+    "Emoji Translator": "You are EmojiBot. Translate everything into emoji-speak.",
+    "Creative": "You are a highly creative assistant who replies in imaginative, playful ways using metaphors."
+}
+
 # Function to generate context-aware responses
-def generate_response(question, llm_name, chat_history):
+def generate_response(question, llm_name, chat_history, persona_prompt):
     model = ChatGroq(model=llm_name)
 
-    # Build full conversation
+    # Build conversation
     messages = [
-        SystemMessage(content="You are a helpful assistant. Please respond to the user queries in a formal way.")
+        SystemMessage(content=persona_prompt)
     ]
 
-    # Add chat history to messages
+    # Add chat history
     for role, msg in chat_history:
         if role == "user":
             messages.append(HumanMessage(content=msg))
         elif role == "bot":
             messages.append(AIMessage(content=msg))
 
-    # Add the latest user question
+    # Add new user input
     messages.append(HumanMessage(content=question))
 
-    # Get model response
+    # Invoke model
     response = model.invoke(messages)
     return response.content
 
-# --- Streamlit UI Setup ---
-st.set_page_config(page_title="AI Chatbot", layout="wide", initial_sidebar_state="expanded")
-st.title("💬 Context-Aware AI Chatbot")
+# --- Streamlit UI ---
+st.set_page_config(page_title="Persona AI Chatbot", layout="wide", initial_sidebar_state="expanded")
+st.title("🤖 Persona AI Chatbot")
 
-# Sidebar model selector
+# Sidebar selectors
 llm_model = st.sidebar.selectbox("Choose a model", [
     "deepseek-r1-distill-llama-70b",
     "moonshotai/kimi-k2-instruct",
     "meta-llama/llama-4-scout-17b-16e-instruct"
 ])
+persona_choice = st.sidebar.selectbox("Choose a persona", list(PERSONAS.keys()))
 
-# Session state to keep chat history
+# Chat history
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# Input field at bottom
-user_input = st.chat_input("Ask me anything...")
+# Chat input
+user_input = st.chat_input("Say something...")
 
-# Handle user input
 if user_input:
-    # Add user message
+    # Store user input
     st.session_state.chat_history.append(("user", user_input))
 
-    # Generate bot response with context
-    bot_response = generate_response(user_input, llm_model, st.session_state.chat_history)
+    # Get persona-specific response
+    bot_response = generate_response(
+        user_input,
+        llm_model,
+        st.session_state.chat_history,
+        PERSONAS[persona_choice]
+    )
     bot_response = clean_response(bot_response)
 
-    # Add bot response
+    # Store bot response
     st.session_state.chat_history.append(("bot", bot_response))
 
-# Render chat messages
+# Render messages
 for role, message in st.session_state.chat_history:
     if role == "user":
         st.chat_message("user").write(message)
-    elif role == "bot":
+    else:
         st.chat_message("assistant").write(message)
