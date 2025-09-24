@@ -7,7 +7,6 @@ import re
 
 # Load API keys
 load_dotenv()
-os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
 os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
 
 # Function to clean Groq model responses
@@ -87,4 +86,5 @@ for role, message in st.session_state.chat_history:
         st.chat_message("user").write(message)
     else:
         st.chat_message("assistant").write(message)
+
 
